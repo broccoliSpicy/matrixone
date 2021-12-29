@@ -26,11 +26,10 @@ var (
 
 	// OperatorReturnType records return type for all operator and built-in functions
 	// first map : key is operator or function id (eg: overload.Minus), value is second map :
-	// key is numbers of args, and value is a slice of struct retType (contains information about arg types and return type)
-	OperatorReturnType = make(map[int]map[uint8][]retType)
+	// key is numbers of args, and value is a slice of struct RetType (contains information about arg types and return type)
+	OperatorReturnType = make(map[int]map[uint8][]RetType)
 )
 
-// set init here to make sure this function will be the last executed init function at this package
 func init() {
 	// init overload.BinOps and overload.UnaryOps
 	initOperatorFunctions()
@@ -50,9 +49,9 @@ type castRule struct {
 	targetTypes []types.Type // cast type for each argument
 }
 
-type retType struct {
-	argTypes []types.T
-	ret  	 types.T
+type RetType struct {
+	ArgTypes []types.T
+	Ret      types.T
 }
 
 // GetUnaryOpReturnType returns the returnType of unary ops or binary functions
@@ -60,8 +59,8 @@ func GetUnaryOpReturnType(op int, arg types.T) types.T {
 	if m, ok := OperatorReturnType[op]; ok {
 		if rs, okk := m[1]; okk {
 			for _, r := range rs {
-				if r.argTypes[0] == arg {
-					return r.ret
+				if r.ArgTypes[0] == arg {
+					return r.Ret
 				}
 			}
 		}
@@ -74,8 +73,8 @@ func GetBinOpReturnType(op int, lt, rt types.T) types.T {
 	if m, ok := OperatorReturnType[op]; ok {
 		if rs, okk := m[2]; okk {
 			for _, r := range rs {
-				if r.argTypes[0] == lt && r.argTypes[1] == rt {
-					return r.ret
+				if r.ArgTypes[0] == lt && r.ArgTypes[1] == rt {
+					return r.Ret
 				}
 			}
 		}
@@ -85,7 +84,22 @@ func GetBinOpReturnType(op int, lt, rt types.T) types.T {
 
 // GetMultiReturnType returns the returnType of multi ops or multi functions
 func GetMultiReturnType(op int, ts []types.T) types.T {
-	return types.T_sel
+	if m, ok := OperatorReturnType[op]; ok {
+		if rs, okk := m[uint8(len(ts))]; okk {
+			for _, r := range rs {
+				count := 0
+				for ; count < len(ts); count++ {
+					if r.ArgTypes[count] != ts[count] {
+						break
+					}
+				}
+				if count == len(ts) {
+					return r.Ret
+				}
+			}
+		}
+	}
+	return types.T_any
 }
 
 // appendOperatorRets will add operator-return-type information into related structure
@@ -98,22 +112,23 @@ func appendOperatorRets(op int, args []types.T, ret types.T) {
 
 // AppendFunctionRets will add function-return-type information into related structure
 // op is function id
-// args is a slice of argument types
-// ret is return type of this function
-func AppendFunctionRets(op int, args []types.T, ret types.T) {
-	appendRets(op, args, ret)
+// args is a slice of argument types and return type of this function
+func AppendFunctionRets(op int, args []RetType) {
+	for _, arg := range args {
+		appendRets(op, arg.ArgTypes, arg.Ret)
+	}
 }
 
 // TODO: this function should only be call at init function
 func appendRets(op int, args []types.T, ret types.T) {
 	if _, ok := OperatorReturnType[op]; !ok {
-		OperatorReturnType[op] = make(map[uint8][]retType)
+		OperatorReturnType[op] = make(map[uint8][]RetType)
 	}
 	nArg := uint8(len(args))
 	if _, ok := OperatorReturnType[op][nArg]; !ok {
-		OperatorReturnType[op][nArg] = []retType{}
+		OperatorReturnType[op][nArg] = []RetType{}
 	}
-	OperatorReturnType[op][nArg] = append(OperatorReturnType[op][nArg], retType{argTypes: args, ret: ret})
+	OperatorReturnType[op][nArg] = append(OperatorReturnType[op][nArg], RetType{ArgTypes: args, Ret: ret})
 }
 
 func initOperatorFunctions() {
