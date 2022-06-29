@@ -820,6 +820,28 @@ func bindFuncExprImplByPlanExpr(name string, args []*Expr) (*plan.Expr, error) {
 		}
 	}
 
+	// cast for decimal operator
+	switch name {
+	case "+", "-", "*", "/", "div", "%", ">", ">=", "<", "<=", "=", "!=", "<>":
+		leftExpr, leftIsConstant := args[0].Expr.(*plan.Expr_C)
+		rightExpr, rightIsConstant := args[1].Expr.(*plan.Expr_C)
+		if leftIsConstant && !rightIsConstant {
+			if args[1].Typ.Id == plan.Type_DECIMAL || args[1].Typ.Id == plan.Type_DECIMAL64 || args[1].Typ.Id == plan.Type_DECIMAL128 {
+				args[0], err = makePlan2Decimal128ConstExprAndType(leftExpr.C.OrigString)
+				if err != nil {
+					return nil, err
+				}
+			}
+		} else if !leftIsConstant && rightIsConstant {
+			if args[0].Typ.Id == plan.Type_DECIMAL || args[0].Typ.Id == plan.Type_DECIMAL64 || args[0].Typ.Id == plan.Type_DECIMAL128 {
+				args[1], err = makePlan2Decimal128ConstExprAndType(rightExpr.C.OrigString)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
 	// get args(exprs) & types
 	argsLength := len(args)
 	argsType := make([]types.T, argsLength)
