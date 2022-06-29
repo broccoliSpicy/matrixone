@@ -111,6 +111,32 @@ func makePlan2Decimal128ConstExpr(v types.Decimal128) *plan.Expr_C {
 	}}
 }
 
+func makePlan2Decimal128ConstExprAndType(val string) (*Expr, error) {
+	v, scale, err := types.ParseStringToDecimal128WithoutTable(val)
+	if err != nil {
+		return nil, err
+	}
+	typ := &plan.Type{
+		Id:        plan.Type_DECIMAL128,
+		Width:     int32(len(val)),
+		Precision: 38,
+		Scale:     scale,
+		Nullable:  false,
+	}
+	return &Expr{
+		Typ: typ,
+		Expr: &plan.Expr_C{
+			C: &Const{
+				OrigString: val,
+				Isnull:     false,
+				Value: &plan.Const_Decimal128Val{
+					Decimal128Val: &plan.Decimal128{Lo: v.Lo, Hi: v.Hi},
+				},
+			},
+		},
+	}, nil
+}
+
 func makePlan2TimestampConstExpr(v types.Timestamp) *plan.Expr_C {
 	return &plan.Expr_C{C: &plan.Const{
 		Isnull: false,

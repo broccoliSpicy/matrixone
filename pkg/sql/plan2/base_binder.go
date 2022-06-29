@@ -874,7 +874,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: false,
+					OrigString: astExpr.String(),
+					Isnull:     false,
 					Value: &plan.Const_Sval{
 						Sval: val,
 					},
@@ -889,22 +890,13 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		}
 	}
 
-	returnDecimalExpr := func(val string) (*Expr, error) {
-		typ := &plan.Type{
-			Id:       plan.Type_DECIMAL128,
-			Width:    int32(len(val)),
-			Scale:    0,
-			Nullable: false,
-		}
-		return appendCastBeforeExpr(getStringExpr(val), typ)
-	}
-
 	switch astExpr.ValType {
 	case tree.P_null:
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: true,
+					OrigString: astExpr.String(),
+					Isnull:     true,
 				},
 			},
 			Typ: &plan.Type{
@@ -917,7 +909,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: false,
+					OrigString: astExpr.String(),
+					Isnull:     false,
 					Value: &plan.Const_Bval{
 						Bval: val,
 					},
@@ -937,7 +930,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: false,
+					OrigString: astExpr.String(),
+					Isnull:     false,
 					Value: &plan.Const_Ival{
 						Ival: val,
 					},
@@ -957,7 +951,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: false,
+					OrigString: astExpr.String(),
+					Isnull:     false,
 					Value: &plan.Const_Uval{
 						Uval: val,
 					},
@@ -970,11 +965,11 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 			},
 		}, nil
 	case tree.P_decimal:
-		return returnDecimalExpr(astExpr.String())
+		return makePlan2Decimal128ConstExprAndType(astExpr.String())
 	case tree.P_float64:
 		floatValue, ok := constant.Float64Val(astExpr.Value)
 		if !ok {
-			return returnDecimalExpr(astExpr.String())
+			return makePlan2Decimal128ConstExprAndType(astExpr.String())
 		}
 		//if astExpr.Negative() {
 		//	floatValue = -floatValue
@@ -982,7 +977,8 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 		return &Expr{
 			Expr: &plan.Expr_C{
 				C: &Const{
-					Isnull: false,
+					OrigString: astExpr.String(),
+					Isnull:     false,
 					Value: &plan.Const_Dval{
 						Dval: floatValue,
 					},
@@ -995,9 +991,9 @@ func (b *baseBinder) bindNumVal(astExpr *tree.NumVal) (*Expr, error) {
 			},
 		}, nil
 	case tree.P_hexnum:
-		return returnDecimalExpr(astExpr.String())
+		return makePlan2Decimal128ConstExprAndType(astExpr.String())
 	case tree.P_bit:
-		return returnDecimalExpr(astExpr.String())
+		return makePlan2Decimal128ConstExprAndType(astExpr.String())
 	case tree.P_char:
 		stringValue := constant.StringVal(astExpr.Value)
 		return getStringExpr(stringValue), nil
@@ -1019,6 +1015,11 @@ func appendCastBeforeExpr(expr *Expr, toType *Type) (*Expr, error) {
 	_, funcId, _, err := function.GetFunctionByName("cast", argsType)
 	if err != nil {
 		return nil, err
+	}
+	if constExpr, ok := expr.Expr.(*plan.Expr_C); ok {
+		if toType.Id == plan.Type_DECIMAL || toType.Id == plan.Type_DECIMAL64 || toType.Id == plan.Type_DECIMAL128 {
+			return makePlan2Decimal128ConstExprAndType(constExpr.C.OrigString)
+		}
 	}
 	return &Expr{
 		Expr: &plan.Expr_F{

@@ -97,6 +97,7 @@ message Const {
 		decimal128 decimal128val = 11;
 		int64 timestampval = 12;
 	}
+	string orig_string  = 13;
 }
 
 // Bounded param for prepared statement.  User fill on execution.
